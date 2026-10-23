@@ -267,9 +267,11 @@
 				PROFESOR CO-GUÍA\ifnum\xi>1 \ \xi \fi:\\ \MakeUppercase\x\\
 			}
 
+		\ifx\@comision\@empty\else
 		\vspace{1cm}
 			MIEMBROS DE LA COMISIÓN:\\
 			\foreach \x in \@comision { \MakeUppercase\x\\ }
+		\fi
 
 		\if\@auspicio\@empty\else
 		\vfill

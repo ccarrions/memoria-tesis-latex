@@ -1,3 +1,21 @@
 .svn
 .svn/*
 memoria_latex.zip
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lol
+*.lot
+*.out
+*.run.xml
+*.synctex.gz
+*.synctex(busy)
+*.toc
+*.xdv

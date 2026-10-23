@@ -1,0 +1,482 @@
+% Apéndice: Kernel Sources
+% Codificación: UTF-8
+
+\chapter{Kernel Sources}
+\label{app:kernels}
+
+This appendix lists the OpenCL C source of every kernel of the suite of
+Section~\ref{sec:eval-results}, in the order of Table~\ref{tab:suite}.
+The shuffle kernels carry the \texttt{intel\_reqd\_sub\_group\_size}
+attribute, which fixes the sub-group size at 32, and take the number of
+elements per work-item as the argument \texttt{N}.
+
+\section*{Basics}
+
+\begin{lstlisting}[language=C, caption={[Source of vadd]OpenCL source of \texttt{vadd}.}, label={lst:app-vadd}]
+__kernel void vadd(__global int *a, __global int *b, __global int *c)
+{
+    int i = get_global_id(0);
+    c[i] = a[i] + b[i];
+}
+\end{lstlisting}
+
+\section*{Control flow}
+
+\begin{lstlisting}[language=C, caption={[Source of vadd\_if\_else]OpenCL source of \texttt{vadd\_if\_else}.}, label={lst:app-vadd-if-else}]
+__kernel void vadd_if_else(__global int *a, __global int *b, __global int *c)
+{
+    int i = get_global_id(0);
+    if (i % 4 == 0)
+        c[i] = a[i] + b[i];
+    else
+        c[i] = a[i] - 1;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of vadd\_mod]OpenCL source of \texttt{vadd\_mod}.}, label={lst:app-vadd-mod}]
+__kernel void vadd_mod(__global int *a, __global int *b, __global int *c)
+{
+    int i = get_global_id(0);
+    if (i % 2 == 0) {
+        c[i + 1] = a[i + 1] + b[i];
+    }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of nested\_if]OpenCL source of \texttt{nested\_if}.}, label={lst:app-nested-if}]
+__kernel void nested_if(__global int *a, __global int *b, __global int *c)
+{
+    int j = get_local_id(0);
+    int i = a[j];
+    int r = -1;
+    if (i >= 16) {
+        if (i >= 24) {
+            if (i >= 28) {
+                if (i >= 30)
+                    r = 30;
+                else
+                    r = 28;
+            }
+            else if (i >= 26)
+                r = 26;
+            else
+                r = 24;
+        }
+        else {
+            if (i >= 20) {
+                if (i >= 22)
+                    r = 22;
+                else
+                    r = 20;
+            }
+            else if (i >= 18)
+                r = 18;
+            else
+                r = 16;
+        }
+    }
+    else {
+        if (i >= 8) {
+            if (i >= 12) {
+                if (i >= 14)
+                    r = 14;
+                else
+                    r = 12;
+            }
+            else if (i >= 10)
+                r = 10;
+            else
+                r = 8;
+        }
+        else {
+            if (i >= 4) {
+                if (i >= 6)
+                    r = 6;
+                else
+                    r = 4;
+            }
+            else if (i >= 2)
+                r = 2;
+            else
+                r = 0;
+        }
+    }
+    c[j] = r;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of loop]OpenCL source of \texttt{loop}.}, label={lst:app-loop}]
+__kernel void loop(__global const int *a, __global int *out)
+{
+    int gid  = get_global_id(0);
+    int lid  = get_sub_group_local_id();
+    int base = gid - lid;
+    int s = 0;
+    for (int i = 0; i < lid; i++)
+        s += a[base + i];
+    out[gid] = s;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of nested\_loop]OpenCL source of \texttt{nested\_loop}.}, label={lst:app-nested-loop}]
+__kernel void nested_loop(__global const int *a, __global int *out)
+{
+    int gid  = get_global_id(0);
+    int lid  = get_sub_group_local_id();
+    int base = gid - lid;
+    int s = 0;
+    __attribute__((opencl_unroll_hint(1)))
+    for (int i = 0; i < lid; i++) {
+        __attribute__((opencl_unroll_hint(1)))
+        for (int j = 0; j < 4; j++)
+            s += a[base + 4 * i + j];
+    }
+    out[gid] = s;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of control\_flow]OpenCL source of \texttt{control\_flow}.}, label={lst:app-control-flow}]
+__kernel void control_flow(__global int *result)
+{
+    int lid = get_sub_group_local_id();
+    int cnt = 0;
+    for (int i = 0; i < lid; i++) {
+        int k = i % 8;
+        switch (k) {
+        case 0:
+            cnt++;
+            break;
+        case 1:
+            cnt += i;
+        case 2:
+            cnt--;
+            break;
+        case 3:
+        case 4:
+            cnt += 2;
+            continue;
+            break;
+        case 5:
+            {
+            int j = i;
+            do {
+                cnt += j;
+            } while (j-- > 0);
+            break;
+            }
+        case 7:
+            {
+            int m = i / 8;
+            if (m == 0)
+                cnt--;
+            else if (m == 1)
+                break;
+            else if (m == 2)
+                continue;
+            else
+                cnt++;
+            }
+        default:
+            cnt++;
+        }
+    }
+    result[lid] = cnt;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of control\_flow1]OpenCL source of \texttt{control\_flow1}.}, label={lst:app-control-flow1}]
+__kernel void control_flow1(__global int *result)
+{
+    int lid = get_sub_group_local_id();
+    int cnt = 0;
+    for (int i = 0; i < 2 * lid; i++) {
+        int k = i % 8;
+        switch (k) {
+        case 0:
+            switch (i) {
+            case 0:
+                break;
+            case 8:
+                cnt++;
+            case 16:
+                continue;
+                break;
+            case 24:
+                cnt--;
+                break;
+            default:
+                for (int j = 0; j < i; j++) {
+                    if (j < 4) {
+                        cnt++;
+                    }
+                    else if (j == 8)
+                        cnt += 3;
+                    else if (j > 16 && j < 24)
+                        continue;
+                    else
+                        cnt += 2;
+                }
+            }
+            break;
+        case 1:
+            cnt += i;
+        case 2:
+            cnt--;
+            break;
+        case 3:
+        case 4:
+            cnt += 2;
+            continue;
+            break;
+        case 5:
+            {
+            int j = i;
+            do {
+                cnt += j;
+            } while (j-- > 0);
+            break;
+            }
+        case 7:
+            {
+            int m = i / 8;
+            if (m == 0)
+                cnt--;
+            else if (m == 1)
+                break;
+            else if (m == 2)
+                continue;
+            else
+                cnt++;
+            }
+        default:
+            cnt++;
+        }
+    }
+    result[lid] = cnt;
+}
+\end{lstlisting}
+
+\section*{Sub-group communication}
+
+\begin{lstlisting}[language=C, caption={[Source of shfl1]OpenCL source of \texttt{shfl1}.}, label={lst:app-shfl1}]
+__attribute__((intel_reqd_sub_group_size(32)))
+__kernel void shfl1(__global int *a, __global int *b, __global int *c, int N)
+{
+    int id  = get_global_id(0);
+    int lix = get_sub_group_local_id();
+
+    int sum = 0;
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++)
+            sum += intel_sub_group_shuffle(a[id * N + i], j);
+    }
+    c[lix] = sum;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of shfl2]OpenCL source of \texttt{shfl2}.}, label={lst:app-shfl2}]
+__attribute__((intel_reqd_sub_group_size(32)))
+__kernel void shfl2(__global int *a, __global int *b, __global int *c, int N)
+{
+    int id  = get_global_id(0);
+    int lix = get_sub_group_local_id();
+
+    int sum = 0;
+    for (int i = 0; i < N; i++) {
+        sum += intel_sub_group_shuffle(a[id * N + i], 31);
+    }
+    c[lix] = sum;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of shfl3]OpenCL source of \texttt{shfl3}.}, label={lst:app-shfl3}]
+__attribute__((intel_reqd_sub_group_size(32)))
+__kernel void shfl3(__global int *a, __global int *b, __global int *c, int N)
+{
+    int id = get_global_id(0);
+
+    int sum = 0;
+    for (int i = 0; i < N; i++) {
+        int lix = (id + 1) % 32;
+        sum += intel_sub_group_shuffle(a[id * N + i], lix)
+             * intel_sub_group_shuffle(b[id * N + i], lix);
+    }
+    c[id] = sum;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of shfl\_dn1]OpenCL source of \texttt{shfl\_dn1}.}, label={lst:app-shfl-dn1}]
+__attribute__((intel_reqd_sub_group_size(32)))
+__kernel void shfl_dn1(__global int *a, __global int *b, __global int *c, int N)
+{
+    int id  = get_global_id(0);
+    int lix = get_sub_group_local_id();
+
+    int red = a[id * N] * b[id * N];
+
+    for (int j = 16; j > 0; j = j / 2)
+        red += intel_sub_group_shuffle_down(red, red, j);
+    c[lix] = red;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of shfl\_dn2]OpenCL source of \texttt{shfl\_dn2}.}, label={lst:app-shfl-dn2}]
+__attribute__((intel_reqd_sub_group_size(32)))
+__kernel void shfl_dn2(__global int *a, __global int *b, __global int *c, int N)
+{
+    int id  = get_global_id(0);
+    int lix = get_sub_group_local_id();
+
+    for (int i = 0; i < N; i++) {
+        int red = a[id * N + i] * b[id * N + i];
+
+        for (int j = 16; j > 0; j = j / 2)
+            red += intel_sub_group_shuffle_down(red, 0, j);
+        if (lix == 0)
+            c[i] = red;
+    }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of shfl\_dn3]OpenCL source of \texttt{shfl\_dn3}.}, label={lst:app-shfl-dn3}]
+__attribute__((intel_reqd_sub_group_size(32)))
+__kernel void shfl_dn3(__global int *a, __global int *b, __global int *c, int N)
+{
+    int id  = get_global_id(0);
+    int lix = get_sub_group_local_id();
+
+    for (int i = 0; i < N; i++) {
+        int red = a[id * N + i] * b[id * N + i];
+
+        for (int j = N / 2; j > 0; j = j / 2)
+            red += intel_sub_group_shuffle_down(red, 0, j);
+        if (lix == 0)
+            c[i] = red;
+    }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of shfl\_up1]OpenCL source of \texttt{shfl\_up1}.}, label={lst:app-shfl-up1}]
+__attribute__((intel_reqd_sub_group_size(32)))
+__kernel void shfl_up1(__global int *a, __global int *b, __global int *c, int N)
+{
+    int id  = get_global_id(0);
+    int lix = get_sub_group_local_id();
+
+    int red = a[id * N] * b[id * N];
+
+    for (int j = 16; j > 0; j = j / 2)
+        red += intel_sub_group_shuffle_up(red, red, j);
+    c[lix] = red;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of shfl\_up2]OpenCL source of \texttt{shfl\_up2}.}, label={lst:app-shfl-up2}]
+__attribute__((intel_reqd_sub_group_size(32)))
+__kernel void shfl_up2(__global int *a, __global int *b, __global int *c, int N)
+{
+    int id  = get_global_id(0);
+    int lix = get_sub_group_local_id();
+
+    int red = a[id * N] * b[id * N];
+
+    for (int j = N / 2; j > 0; j = j / 2)
+        red += intel_sub_group_shuffle_up(red, red, j);
+    c[lix] = red;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of shfl\_up3]OpenCL source of \texttt{shfl\_up3}.}, label={lst:app-shfl-up3}]
+__attribute__((intel_reqd_sub_group_size(32)))
+__kernel void shfl_up3(__global int *a, __global int *b, __global int *c, int N)
+{
+    int id  = get_global_id(0);
+    int lix = get_sub_group_local_id();
+
+    for (int i = 0; i < N; i++) {
+        int red = a[id * N + i] * b[id * N + i];
+
+        for (int j = 16; j > 0; j = j / 2)
+            red += intel_sub_group_shuffle_up(0, red, j);
+        if (lix == 31)
+            c[i] = red;
+    }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of shfl\_xor1]OpenCL source of \texttt{shfl\_xor1}.}, label={lst:app-shfl-xor1}]
+__attribute__((intel_reqd_sub_group_size(32)))
+__kernel void shfl_xor1(__global int *a, __global int *b, __global int *c, int N)
+{
+    int id  = get_global_id(0);
+    int lix = get_sub_group_local_id();
+
+    int sum = 0;
+    for (int i = 0; i < N; i++) {
+        sum += intel_sub_group_shuffle_xor(a[id * N + i], 0x1F)
+             * intel_sub_group_shuffle_xor(b[id * N + i], 0x1F);
+    }
+    c[lix] = sum;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of shfl\_xor2]OpenCL source of \texttt{shfl\_xor2}.}, label={lst:app-shfl-xor2}]
+__attribute__((intel_reqd_sub_group_size(32)))
+__kernel void shfl_xor2(__global int *a, __global int *b, __global int *c, int N)
+{
+    int id  = get_global_id(0);
+    int lix = get_sub_group_local_id();
+
+    if (lix < 16) {
+        int sum = 0;
+        for (int i = 0; i < N; i++) {
+            sum += intel_sub_group_shuffle_xor(a[id * N + i], 0xF)
+                 * intel_sub_group_shuffle_xor(b[id * N + i], 0xF);
+        }
+        c[lix] = sum;
+    }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of prefix\_sum]OpenCL source of \texttt{prefix\_sum}.}, label={lst:app-prefix-sum}]
+__kernel void prefix_sum(__global const int *a, __global int *b)
+{
+    uint gid = get_global_id(0);
+    int x = a[gid];
+
+    b[gid] = sub_group_scan_inclusive_add(x);
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of ired\_sum]OpenCL source of \texttt{ired\_sum}.}, label={lst:app-ired-sum}]
+__kernel void ired_sum(__global int *a, __global int *c)
+{
+    int id = get_global_id(0);
+    c[id] = sub_group_reduce_add(a[id]);
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=C, caption={[Source of reduce\_if\_else]OpenCL source of \texttt{reduce\_if\_else}.}, label={lst:app-reduce-if-else}]
+__kernel void reduce_if_else(__global const int *a, __global int *out)
+{
+    int gid = get_global_id(0);
+    int lid = get_sub_group_local_id();
+    if (lid < 16)
+        out[gid] = sub_group_reduce_add(a[gid]);
+    else
+        out[gid] = -1;
+}
+\end{lstlisting}
+
+\section*{Memory}
+
+\begin{lstlisting}[language=C, caption={[Source of exchange]OpenCL source of \texttt{exchange}.}, label={lst:app-exchange}]
+__kernel void exchange(__global const int *a, __global int *out)
+{
+    __local int buf[32];
+    int gid = get_global_id(0);
+    int lid = get_sub_group_local_id();
+    buf[lid] = a[gid];
+    out[gid] = buf[31 - lid];
+}
+\end{lstlisting}

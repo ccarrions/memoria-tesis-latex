@@ -1,81 +1,195 @@
-% se puede agregar la opción [english] para 
-%  memorias o tesis en inglés (borrando el archivo .aux)
-\documentclass{umemoria} 
+% Clase umemoria en inglés (si se cambia el idioma, borrar el archivo .aux)
+\documentclass[english]{umemoria}
 
-\depto{Departamento de ???}
-\author{Nombre Completo Autor}
-\title{Título de la Memoria/Tesis}
+% ------------------------------------------------------------------------------
+% PORTADA
+% TODO: revisar los datos de la portada (comisión, auspicio).
+% ------------------------------------------------------------------------------
+\depto{Departamento de Ciencias de la Computación}
+\author{Cristián Carrión Saldivia}
+\title{Design and implementation of an Executable Specification for PISA}
 
-% incluir ambos comandos para una doble titulación
-%  o quitar el comando que no aplica
-\memoria{Ingenier[o/a?] Civil en ???}
-\tesis{Magíster en ???}
-%\tesis{Doctor en ???} % incluir solo este comando para doctorados
+% doble titulación: tesis de magíster + memoria de ingeniería
+\tesis{Magíster en Ciencias de la Computación}
+\memoria{Ingeniero Civil en Computación}
 
-% puede haber varios profesores guía seperados por coma;
-% pero si es una memoria, solo puede haber un profesor guía
-\guia{Nombre Completo Guía} 
+\guia{Éric Tanter}
+\coguia{Joel Fuentes}
 
-% puede haber varios profesores co-guía seperados por coma;
-% pero si es una memoria, el profesor co-guía será el primer
-% integrante de la comisión
-%\coguia{Nombre Completo Co-Guía} % incluir en caso de co-guía de *tesis*
-
-%\cotutela{Nombre Institución} % incluir en caso de cotutela
-
-\comision{Nombre Completo Uno,Nombre Completo Dos,Nombre Completo Tres}
+%\comision{Nombre Uno,Nombre Dos} % TODO: comisión pendiente
 
 %\auspicio{Nombre Institución} % incluir en caso de recibir financiamiento
 
-% tiene que ser el año en que se da el examen de título/grado (defensa)
-%\anho{2021} % incluir solo para reemplazar el año actual
+% tiene que ser el año en que se da el examen de grado (defensa)
+%\anho{2026}
 
-\usepackage{lipsum}
+% ------------------------------------------------------------------------------
+% PAQUETES
+% ------------------------------------------------------------------------------
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{lipsum} % solo para el texto provisorio de la portada
+
+% Bibliografía en el índice con el número de página de su inicio y con su
+% propio encabezado (la clase la agrega al índice después de imprimirla)
+\let\bibliography\oldbib
+\renewcommand{\bibsection}{%
+	\chapter*{\bibname}%
+	\addcontentsline{toc}{chapter}{\protect\numberline{}\bibname}%
+	\markboth{\MakeUppercase\bibname}{\MakeUppercase\bibname}}
+
+% ------------------------------------------------------------------------------
+% CÓDIGO FUENTE
+% ------------------------------------------------------------------------------
+\definecolor{dkgray}{RGB}{90, 90, 90}
+\definecolor{dkgreen}{RGB}{0, 150, 0}
+\definecolor{lgray}{RGB}{240, 240, 240}
+\definecolor{mauve}{RGB}{150, 0, 210}
+
+\lstset{
+	aboveskip=0.75em,
+	backgroundcolor=\color{lgray},
+	basicstyle={\small\ttfamily},
+	belowskip=0.95em,
+	breaklines=true,
+	columns=fullflexible,
+	commentstyle=\color{dkgreen}\upshape,
+	frame=ltb,
+	framerule=0pt,
+	keepspaces=true,
+	keywordstyle=\color{blue},
+	numbers=left,
+	numbersep=6pt,
+	numberstyle=\tiny\color{dkgray},
+	postbreak=\mbox{$\hookrightarrow$\space},
+	showstringspaces=false,
+	stringstyle=\color{mauve},
+	tabsize=3
+}
+
+% Definición del lenguaje ASL (Arm Architecture Specification Language) para listings
+\lstdefinelanguage{ASL}{
+	morekeywords={
+		var,let,constant,func,getter,setter,procedure,begin,end,
+		if,then,else,elsif,for,to,downto,do,while,repeat,until,
+		case,when,otherwise,return,array,of,type,record,enumeration,
+		integer,boolean,bits,bit,UNKNOWN,UNPREDICTABLE,SEE
+	},
+	sensitive=true,
+	morecomment=[l]{//},
+	morestring=[b]"
+}
+
+% Nota TODO visible en el pdf: \todo{texto}
+\newcommand{\todo}[1]{%
+	\par\noindent\fcolorbox{red}{red!8}{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}{%
+		\textbf{\textcolor{red}{TODO:}} #1}}\par}
 
 \begin{document}
 
 \frontmatter
 \maketitle
 
+% TODO: dedicatoria y agradecimientos son provisorios.
+% Una tesis en inglés lleva el resumen en ambos idiomas.
 \begin{resumen}
-\lipsum[1-4]
+La mayoría de las ISA de GPU se especifican solo en prosa. Una
+especificación en prosa no puede ejecutarse por sí sola, de manera que
+cada herramienta construida sobre ella, ya sea un compilador, un
+simulador o una suite de tests, opera según su propia interpretación
+del texto, y cualquier interpretación puede estar equivocada. Una
+especificación ejecutable reemplaza esas múltiples interpretaciones
+por una sola. Se lee como documentación y se ejecuta para producir el
+comportamiento que describe. Esta tesis desarrolla una especificación
+ejecutable de PISA, la ISA virtual que Intel publicó para sus GPU. La
+especificación está escrita en ASL, el Architecture Specification
+Language de Arm.
+
+La especificación cubre un subconjunto de PISA que modela la ejecución
+a nivel de subgrupo. Con ese subconjunto, un kernel puede intercambiar
+datos con el host, realizar aritmética de enteros, comunicar valores
+entre lanes y ejecutar branches. PISA no define cómo avanzan los lanes
+de un subgrupo ni cómo reconvergen, por lo que la especificación lo
+define. Los lanes se ejecutan en lockstep, y los lanes divergentes
+reconvergen mediante una regla stackless, que depende únicamente de
+los program counters de cada lane. Un parser traduce los kernels de
+PISA a ASL, y una host library expone la especificación compilada a
+través de la interfaz de OpenCL, de modo que un kernel compilado desde
+OpenCL corre en ella sin modificaciones.
+
+La especificación se comprueba con una suite de tests. Esta incluye
+smoke tests que cubren cada instrucción del subconjunto contra el
+documento de PISA, y kernel tests compilados desde OpenCL que ponen a
+prueba la divergencia y las operaciones entre lanes. La suite
+encontró, además, errores en los ejemplos del documento de PISA. Hasta
+donde sabemos, esta es la única especificación ejecutable de PISA.
 \end{resumen}
 
-% opcional: incluir para tesis en inglés;
-%  en este caso hay que tener el resumen y abstract
-%   en ambos idiomas
-%\begin{abstract}
-%\lipsum[1-4]
-%\end{abstract}
+\begin{abstract}
+Most GPU ISA specifications exist only in prose. A prose
+specification cannot run by itself, so each tool built on it, a
+compiler, a simulator, a test suite, works from its own interpretation of the text, and an
+interpretation can be mistaken. An executable specification replaces
+those separate interpretations with a single one that runs. It reads as
+documentation and runs to produce the behavior it describes.
+This thesis develops an executable specification of PISA, the virtual 
+instruction set Intel has published for its GPUs. The specification is 
+written in ASL, Arm's Architecture Specification Language.
+
+The specification covers a subset of PISA that models execution at the
+sub-group level. It can exchange data with the host, perform integer arithmetic, 
+communicate across lanes, and branch. PISA does not define how the
+lanes of a sub-group advance or how they reconverge, so the
+specification defines it. Lanes
+execute in lockstep, and divergent lanes reconverge by a stackless rule
+driven by the per-lane program counters alone. A parser translates PISA
+kernels into ASL, and a host library exposes the compiled specification
+through the OpenCL interface, so that kernels compiled from OpenCL run
+on it without change.
+
+The specification is checked against a test suite. It includes smoke tests that
+cover every instruction of the subset against the PISA document, and
+kernel tests compiled from OpenCL that exercise divergence and
+cross-lane operations. The suite also found errors in the examples of
+the PISA document. To our knowledge, this is the only executable
+specification of PISA.
+\end{abstract}
 
 \begin{dedicatoria}
-Una dedicatoria corta.
+Una frase de dedicatoria, \\
+pueden ser dos líneas.
 \end{dedicatoria}
 
 \begin{thanks}
-\lipsum[1-2]
+\lipsum[1]
 \end{thanks}
 
 \tableofcontents
-\listoftables % opcional
-\listoffigures % opcional
+\listoftables
+\listoffigures
 
 \mainmatter
 
-\input{intro.tex}
-\input{cap2.tex}
-\input{cap3.tex}
-\input{conclu.tex}
+% ------------------------------------------------------------------------------
+% CAPÍTULOS
+% Cada capítulo vive en chapters/. El material antiguo que no pertenece a
+% ningún capítulo vigente está en chapters/draft.tex, que NO se compila.
+% ------------------------------------------------------------------------------
+\input{chapters/introduction}
+\input{chapters/background}
+\input{chapters/design-implementation}
+\input{chapters/evaluation}
+\input{chapters/conclusion}
 
-% ver https://www.overleaf.com/learn/latex/Glossaries
-% \input{glosario.tex} % opcional
+\bibliographystyle{natnumurl}
+\bibliography{library}
 
-\nocite{*}
-\bibliographystyle{plain}
-\bibliography{bibliografia}
-
-% opcional ...
 \begin{appendices}
-\input{anexoA.tex}
+\input{chapters/appendix}
 \end{appendices}
+
 \end{document}

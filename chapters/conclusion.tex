@@ -1,0 +1,159 @@
+% Capítulo: Conclusion
+% Codificación: UTF-8
+
+\chapter{Conclusion and Future Work}
+\label{chap:conclusion}
+
+The objective of this thesis was to develop an executable specification
+of PISA in ASL, one that reads as documentation of the instruction set
+and runs as its reference, covering a subset that models execution at
+the sub-group level, with its own reconvergence model where PISA leaves
+divergent control flow open, together with the tools to run kernels on
+it and a test suite to check it. All of it was achieved. The
+specification covers the subset of Section~\ref{sec:pisa-subset},
+compiles to a C library, runs kernels compiled from OpenCL over any
+number of work-groups and sub-groups, and passes every test of the
+suite built to check it, against its references.
+
+The first contribution is the specification itself. It defines the
+state of a sub-group, the semantics of each instruction of the subset
+as a function, and an execution model that applies one instruction per
+step across the active lanes, in two passes, so that every read of a
+step happens before any of its writes. Where PISA does not say how the
+work-items of a sub-group execute, the specification adopts lockstep
+execution, and where PISA does not say how divergent lanes reconverge,
+it defines a stackless rule: at the start of every step the global
+program counter is the lowest counter among the lanes that have not
+terminated, and the lanes at that counter are the active ones. The rule
+takes a few lines of ASL, and the active mask follows from the per-lane
+program counters alone. The same source reads as a description of what
+each instruction does and compiles to a library that runs it. To our
+knowledge, it is the only executable specification of PISA.
+
+The second contribution is the tooling that makes the specification
+usable. PISA has no binary encoding, so a parser takes the place of a
+decoder and translates a PISA kernel into the ASL function that sets up
+its variables and its instruction buffer. A host library exposes the
+compiled specification through the OpenCL interface, so that an
+ordinary OpenCL host program allocates buffers, sets arguments,
+launches a kernel over an NDRange and reads the results back. Together
+they let a kernel compiled from OpenCL run on the specification without
+change.
+
+The third contribution is the test suite and the evaluation against it.
+The 26 smoke tests, with around 300 cases, check every variant of every
+instruction of the subset against the PISA document, and the 23 kernels
+compiled from OpenCL check that the instructions compose, that the
+sub-group diverges and reconverges as the model specifies, and that
+data goes from the host to the kernel and back. Every case and every
+kernel matches its expected output. That includes the two kernels
+whose outputs depend on which lanes are active at a shuffle or a
+reduction. The suite was built alongside the specification and ran
+after every change. It caught the bugs of the first versions, mainly in
+the handling of divergence, and it found two errors in the examples of
+the PISA document, which were reported to its maintainers.
+
+The evaluation also showed what the specification is for beyond this
+thesis. The smoke tests are regression tests. If the ASL lives alongside the
+PISA document, a change to an instruction is made in both, and the
+tests say at once whether anything else broke. They also run the
+document's own examples, which is how the two errors in them were identified.
+The kernel tests also serve to check a compiler: a kernel's expected
+output comes from its OpenCL source, and its actual output from the
+compiled PISA run on the specification, so with the specification as
+the reference, a mismatch points at the compiler. And any other tool that runs PISA kernels can be compared
+with the specification by running the same kernels on the same inputs,
+with no expected output needed at all.
+
+\section{Limitations}
+
+The specification covers a subset of PISA. It has no floating point,
+no function calls, and no barriers, fences or atomics. Without floating
+point it supports no floating-point workload. Without calls it cannot
+run a kernel whose functions a compiler does not inline. Without
+synchronization, the sub-groups of a launch run one after another, so
+communication between sub-groups through memory sees the result of
+that fixed order, and a workload in which sub-groups exchange data can
+be racy.
+
+PISA does not define reconvergence, so the model is a choice of the
+specification, and other valid choices exist. The suite cannot tell
+them apart: in the two kernels whose outputs depend on reconvergence,
+the paths of every branch rejoin after both of them in instruction
+order, as compiler-emitted code usually does, and on such code every common
+scheme activates the same lanes at the same instructions. The rule also
+orders lanes by program counter alone, which stops working once calls
+are added, since a lane inside a called function can be at a lower
+address than a lane that has not made the call.
+
+Some behaviors the specification defines are not exercised by the
+suite, and by design. The specification expects well-formed kernels, as
+produced from real workloads by a compiler, and such kernels do not
+contain unstructured branches, do not end other than in a return, and
+do not store to one address from several lanes in one step. The
+specification gives each of these cases a behavior, since it must do
+something: it writes results back in lane order, it reconverges lanes
+later or elsewhere when a join precedes a path, and it assumes that the
+last instruction of a kernel is a return. It also places no bound on
+the number of steps, so a kernel in which a lane never terminates does
+not complete. The evaluation makes no claim about any of these cases.
+
+The evaluation is a set of tests, so it shows that the specification
+is correct on the kernels of the suite, not on every program PISA
+admits. And since all the kernels were compiled with the same
+pre-release build of the LLVM PISA compiler, the suite covers the code
+patterns that build produces and no others.
+
+Finally, the parser assumes a well-formed kernel, with every variable
+declared and every label defined. The host
+library accepts work-groups whose size is a multiple of 32 and one
+kernel launch per host program.
+
+\section{Future Work}
+
+The first direction is extending the subset. Most of the instructions
+PISA adds beyond the subset, the floating point ones first, are new
+semantic functions in the existing framework and need no change to the
+execution model.
+
+The second is extending the execution model. Calls need a call stack
+per lane and a reconvergence rule that accounts for call depth, since
+program counter order alone no longer says which lanes are behind once
+lanes are inside different calls. Collange's ordering by stack depth
+before program counter~\cite{collange-stackless} is one alternative.
+Barriers, fences and atomics need several sub-groups in flight at once,
+with more state, a rule for scheduling between them, and a mechanism
+for lanes to wait on one another. With that in place, the three have
+an order to define, at the sub-group and at the work-group level.
+
+The third is extending the test suite. Well-known test suites for GPU
+algorithms, such as reductions, scans, sorting and matrix operations,
+can be added once the subset supports what they need. Hand-written
+PISA kernels can cover the layouts compiled code does not produce,
+where the reconvergence schemes differ. And once the LLVM PISA compiler
+is released upstream, the kernels of Appendix~\ref{app:kernels} can be
+recompiled with it and the suite run again, to confirm that the results
+hold on the released compiler.
+
+The fourth is using the existing ASL toolchain. ASL translates into Sail, and
+from Sail into emulators and into definitions for theorem
+provers~\cite{isa-semantics}, where properties of the execution model
+can be proved, such as the guarantee of Section~\ref{sec:asl-divergence}
+that the active lanes at every step are exactly the non-terminated
+lanes at the lowest counter.
+
+The remaining directions are engineering. The parser can be completed
+to accept all of PISA, so that a kernel outside the subset is reported
+by the specification rather than rejected by the parser. One
+observation applies here. The parser exists only because PISA has no
+binary encoding. If PISA ever had one, the parser would go away: ASL
+decodes instructions from their bit patterns, as the other
+specifications written in it do, so the decoder would be part of the
+specification itself, and supporting a new instruction would mean
+adding its encoding and its semantics in one place. The host library
+can accept several launches and several kernels per program, and load
+kernels at run time instead of by registration. And the parts of the
+specification that mirror the PISA document, the instruction tables
+and the operand formats that the parser and the instruction record now
+encode by hand, can be generated from the sources of the document,
+which would keep the specification in step with PISA as it evolves.

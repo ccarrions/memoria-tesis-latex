@@ -1,0 +1,119 @@
+\chapter{Introduction}
+\label{chap:introduction}
+
+\section{Motivation}
+
+The GPU industry has grown significantly in the last decade, driven by
+applications far beyond its traditional purpose in graphics rendering.
+GPUs are now essential in machine learning, one of today's fastest-growing
+industries, as well as in scientific computing, data analytics, and
+autonomous systems. As GPU architectures have evolved to meet these
+demands, they have become more complex, incorporating sophisticated
+memory hierarchies, intricate synchronization mechanisms, and advanced
+execution models. Precise specification of GPU instruction set
+architectures (ISAs) has therefore become more important than ever:
+hardware designers, compiler developers, and software engineers all
+depend on accurate ISA documentation to build correct and efficient
+systems.
+
+Traditionally, ISA specifications have been written as natural-language
+documents, often hundreds of pages long, describing instruction
+encodings, semantics, memory models, and execution behaviors. Relying
+solely on natural-language specifications has significant drawbacks. Such
+specifications can be ambiguous, leaving room for multiple
+interpretations of critical behaviors. They are difficult to validate
+against actual hardware implementations, often leading to subtle
+discrepancies between documented and observed behavior. As ISAs have
+grown in complexity, these challenges have become more pronounced.
+
+Executable ISA specifications offer a compelling complement to
+traditional ISA documentation. An executable specification is a formal,
+machine-readable description of an ISA that can be run. When used
+alongside handwritten ISA documents, executable specifications provide
+unambiguous semantics that clarify ambiguities in the natural-language
+descriptions and resolve points where multiple interpretations are
+possible. Because they are executable, these specifications can be
+tested against hardware implementations, ensuring
+consistency between the documented behavior and actual processor
+execution. They serve multiple purposes: as precise reference
+documentation that eliminates ambiguity, as executable models for
+validation and testing, as foundations for formal verification efforts,
+and as tools for generating comprehensive test suites. The CPU
+architecture community has demonstrated the value of this approach, with
+projects such as the RISC-V formal specification in Sail and ARM's
+ASL-based specifications showing how executable models, when paired with
+traditional documentation, can significantly improve both specification
+quality and the broader ecosystem tooling that depends on clear ISA
+semantics.
+
+Despite these advances in CPU ISA specification, GPU architectures have
+largely remained documented through traditional means. While some GPU
+manufacturers have made portions of their specifications publicly
+available, no GPU ISA has an executable specification from its provider.
+This gap is particularly significant given the growing role of GPUs in
+domains where correctness and reliability are paramount. Moreover, the
+SIMT (Single Instruction, Multiple Thread) execution model that defines
+GPU behavior introduces unique challenges for formal specification,
+including thread divergence and reconvergence semantics, hierarchical
+memory spaces, and fine-grained synchronization primitives that differ
+substantially from conventional CPU models.
+
+\section{Objective and Scope}
+
+The objective of this thesis is to develop an executable specification of
+PISA, the virtual instruction set Intel has published for its
+GPUs~\cite{pisa-spec}. The specification is written in ASL, so that it
+can be read as documentation of the instruction set and run as its
+reference. It covers a subset of PISA, chosen to model execution at the sub-group
+level. The subset can exchange data with the host, perform integer
+arithmetic, communicate across lanes and branch. The specification
+defines its own reconvergence model for divergent control flow, which
+PISA leaves open.
+
+To run kernels on the specification, a parser translates PISA text into
+the ASL code that loads a kernel into the specification's state, and a
+host library presents the specification as an OpenCL device, so that a
+host program can launch kernels on it as on any other device The
+specification is checked with smoke tests for each instruction and with
+kernel workloads compiled from OpenCL.
+
+\section{Contributions}
+
+The contributions of this thesis are the following.
+
+\begin{itemize}
+\item An executable specification, in ASL, of a subset of PISA: its
+  architectural state, the semantics of each instruction, and an
+  execution model for a sub-group of 32 work-items, including
+  its own reconvergence model for divergent control flow. To our knowledge, it is
+  the only executable specification for PISA.
+\item The tools that make the specification run: a parser from PISA text
+  to ASL and a host library that exposes the specification through the
+  OpenCL interface.
+\item A test suite for the specification, with smoke tests for each
+  instruction of the subset and a set of kernel workloads compiled from
+  OpenCL, and the evaluation of the specification against it.
+\end{itemize}
+
+\section{Thesis Structure}
+
+The rest of this thesis is organized as follows.
+
+\begin{itemize}
+\item Chapter~\ref{chap:background} gives the background: what an ISA
+  specification is and what an executable one adds, PISA and its
+  execution model, the state of formal and executable specifications for
+  GPU ISAs, and ASL, the language the specification is written in.
+\item Chapter~\ref{chap:design} presents the specification and the
+  system around it: the subset of PISA that is specified, the ASL
+  specification itself, with its state, instruction semantics, execution
+  model and handling of divergence, and the parser and host library that
+  make kernels run on it.
+\item Chapter~\ref{chap:evaluation} evaluates the specification with
+  smoke tests for each instruction, checked against the PISA document,
+  and with kernel workloads compiled from OpenCL, checked against
+  expected outputs and examined through their execution traces.
+\item Chapter~\ref{chap:conclusion} concludes, states the limitations of the work and lists future work.
+\item Appendix~\ref{app:kernels} gives the source of the evaluation
+  kernels.
+\end{itemize}

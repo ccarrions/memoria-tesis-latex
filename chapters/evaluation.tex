@@ -1,0 +1,433 @@
+% Capítulo: Evaluation
+% Codificación: UTF-8
+
+\chapter{Evaluation}
+\label{chap:evaluation}
+
+The specification is evaluated with a test suite. The suite has two
+parts, each with its own reference. The smoke tests are handwritten
+kernels, one per instruction, that exercise all of its variants and
+compare the results with golden values derived from the PISA
+document~\cite{pisa-spec}. The kernel tests run whole kernels compiled
+from OpenCL and compare their outputs with an expected output computed
+from the OpenCL source, by a sequential C++ program or by hand.
+Every test produces a trace of the execution, step by step, which is how
+the specification was debugged and where the traces shown in this
+chapter come from. The suite ran after every new feature and caught the
+bugs of the first versions, mainly in the handling of divergence.
+
+As can be expected, the suite does not cover every possible case of the
+subset. It is complete enough to show that execution within a sub-group
+is correct: that each instruction computes what PISA prescribes, and
+that kernels compose them correctly, including kernels whose work-items
+diverge.
+
+\section{Smoke Tests}
+\label{sec:eval-smoke}
+
+Since the specification was designed so that the semantics of each
+instruction is a function, the smoke tests check that each of these
+functions computes what the PISA document describes. There is one smoke
+test per instruction, a handwritten kernel that covers every variant of
+the instruction, the edge cases of its definition and the examples the
+document gives.
+
+A smoke test is a kernel with no arguments, followed by the golden values
+it must produce. For each case, the kernel sets up the operands with a
+few instructions, executes the subject instruction variant, and moves on to
+the next case. The golden values are the expected
+contents of each destination for each lane, derived from the definition
+in the document. The kernel goes through the parser and runs in ASLi,
+with all 32 lanes active and no host library involved. A script then
+reads the values written from the trace and compares them with the
+golden ones. Listing~\ref{lst:smoke-iadd} shows one case from the smoke
+test of \texttt{iadd}: each lane adds $-16$ to its lane id, so lanes 0
+to 15 obtain a negative result and lanes 16 to 31 a non-negative one, which
+checks that the addition is signed and wraps. The suite has 26 smoke tests, 
+one per instruction, with around 300 cases in all, and every case matches 
+its golden values.
+
+\begin{lstlisting}[caption={[Smoke test for iadd]Smoke
+test for \texttt{iadd.32b}. The kernel is followed by the golden values
+of its destination register, one per lane.}, label={lst:smoke-iadd}]
+.kernel @iadd()
+{
+  .reg .32b %r0
+  iadd.32b %r0, %laneid, -16
+  return
+}
+GOLD
+%r0 : 0xfffffff0 0xfffffff1 0xfffffff2 ... 0xd 0xe 0xf
+\end{lstlisting}
+
+When implementing \texttt{shfl}, the smoke tests made it possible to
+identify two errors in the examples of the PISA
+document~\cite{pisa-spec}. One was a prefix-sum example that assumed
+lanes whose source is out of range do not participate, while the
+actual definition says they retain their own value. The other tried to show a
+segmented shuffle that moved its items down, but set its clamp value to
+0, so once computed no segment was shuffled at all. Executing the
+examples as written exposed both errors, and they were reported
+to the PISA maintainers.
+
+With this, the semantics of each instruction can be taken as correct.
+What remains is to see how they behave together in real workloads, under
+divergence, and with data that comes from a host program.
+
+
+\section{Kernel Tests}
+\label{sec:eval-results}
+
+The kernel tests are built on the host library. Each test is a kernel
+written in OpenCL C and compiled to PISA with a pre-release build of the
+LLVM PISA compiler. Each test also has a host program that sets the
+NDRange, fills the input buffers, launches the kernel through the
+library, and reads the output buffer back. The expected
+output of each kernel is given to the test, and the test passes when the
+buffer read back matches it element by element.
+
+The suite has 23 kernels, listed in Table~\ref{tab:suite} with their
+sources in Appendix~\ref{app:kernels}, in four groups. The first group checks the basics: a kernel with no branches,
+launched over one and over several work-groups, to see that arguments,
+buffers and the global id reach the kernel and the results come back.
+The control flow group checks that the divergence model holds from the
+simple cases to the complex ones. It starts with one branch where the 
+lanes split and rejoin, goes on to
+nested branches and to divergent loops, and ends with two kernels that
+mix loops, switches, breaks and continues into the most complex control
+flow of the suite. The sub-group
+communication group runs the four shuffle patterns and the sum
+reduction, with all lanes active and inside divergent regions, over
+one and over several sub-groups. The memory group checks that the lanes
+of a work-group reach one shared
+space, where a value stored by one lane can be loaded by another: each
+lane stores its element and loads another lane's in a later step, with
+no barrier between the two, since the subset has none. In OpenCL that is
+a race. Under lockstep execution the store of one step is visible to the
+load of the next, so the kernel's output is defined by the execution
+model, and the exchange stays within a sub-group.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lp{0.55\linewidth}>{\raggedright\arraybackslash}p{0.15\linewidth}}
+\toprule
+Kernel & What it exercises &  Work-groups $\times$ sub-groups \\
+\midrule
+\multicolumn{3}{l}{\emph{Basics}} \\
+\texttt{vadd}            & straight-line code, global loads and stores & 1$\times$1, 2$\times$2 \\
+\midrule
+\multicolumn{3}{l}{\emph{Control flow}} \\
+\texttt{vadd\_if\_else}  & one divergent branch, both paths store & 1$\times$1 \\
+\texttt{vadd\_mod}       & one divergent branch, half the lanes skip a region and store nothing & 1$\times$1 \\
+\texttt{nested\_if}      & tree of nested divergent branches, one join before the store & 1$\times$1 \\
+\texttt{loop}            & loop with lane-dependent trip count & 1$\times$2 \\
+\texttt{nested\_loop}    & nested loop inside a lane-dependent loop & 1$\times$2 \\
+\texttt{control\_flow}   & lane-dependent loop around a switch with fall-through, break, continue and a do-while & 1$\times$1 \\
+\texttt{control\_flow1}  & as \texttt{control\_flow}, with a nested switch and an inner loop & 1$\times$1 \\
+\midrule
+\multicolumn{3}{l}{\emph{Sub-group communication}} \\
+\texttt{shfl1}           & \texttt{shfl.idx} inside nested uniform loops, sum over lanes & 1$\times$1 \\
+\texttt{shfl2}           & \texttt{shfl.idx} inside a uniform loop, broadcast of lane 31 & 1$\times$1 \\
+\texttt{shfl3}           & \texttt{shfl.idx} from the next lane, index computed with \texttt{sdiv.rem} & 1$\times$1 \\
+\texttt{shfl\_dn1}       & rotate-down reduction & 1$\times$1 \\
+\texttt{shfl\_dn2}       & zero-fill down-reduction, unrolled, inside a uniform loop, only lane 0 stores & 1$\times$1 \\
+\texttt{shfl\_dn3}       & as \texttt{shfl\_dn2}, with the reduction as a loop whose bound is computed at run time & 1$\times$1 \\
+\texttt{shfl\_up1}       & rotate-up reduction, unrolled & 1$\times$1 \\
+\texttt{shfl\_up2}       & rotate-up reduction, as a loop & 1$\times$1 \\
+\texttt{shfl\_up3}       & zero-fill up-reduction, unrolled, inside a uniform loop, only lane 31 stores & 1$\times$1 \\
+\texttt{shfl\_xor1}      & lane reversal with \texttt{shfl.xor} & 1$\times$1 \\
+\texttt{shfl\_xor2}      & reversal with \texttt{shfl.xor} in a divergent region, lanes 0 to 15 only & 1$\times$1 \\
+\texttt{prefix\_sum}     & inclusive scan, compiled to shuffles up & 1$\times$1, 2$\times$1 \\
+\texttt{ired\_sum}       & \texttt{ired.sum} over the sub-group & 1$\times$1, 1$\times$2 \\
+\texttt{reduce\_if\_else}& \texttt{ired.sum} in a divergent region, lanes 0 to 15 only & 1$\times$1, 1$\times$2 \\
+\midrule
+\multicolumn{3}{l}{\emph{Memory}} \\
+\texttt{exchange}        & values passed between the lanes of a sub-group through shared memory, with no barrier & 2$\times$2 \\
+\bottomrule
+\end{tabular}
+\caption[The kernel suite]{The kernel suite.}
+\label{tab:suite}
+\end{table}
+
+Every kernel is launched over work-groups whose size is a multiple of
+32, and the last column of Table~\ref{tab:suite} shows which kernels
+also run over several work-groups or several sub-groups per work-group.
+The specification records a trace of each sub-group: for every step,
+the global program counter, the active mask, the instruction in PISA
+syntax, and the values written. The traces in this section are
+abridged to the steps that matter, and per-lane values are shown as the
+pattern they follow.
+
+Every kernel matched its expected output at every work-item, in every
+launch. For a kernel without divergence, a matching output is enough.
+For a divergent kernel it is not: a wrong schedule can still produce
+the right output when the paths do not interact. The traces are needed
+to see that the lanes diverge and reconverge as the model specifies.
+The rest of this section follows four kernels through their traces: a
+kernel without divergence, a kernel that diverges forward through
+nested branches, a loop whose lanes leave at different times, and a
+reduction under a partial mask. Masks are written with lane~0 as the
+least significant bit, and a step at a label is shown by the label's
+name.
+
+\paragraph{Uniform Execution: \texttt{vadd}.}
+The first kernel adds two vectors, \texttt{c[i] = a[i] + b[i]}, and has
+no divergence: every work-item executes the same instructions, and the
+mask is \texttt{ffffffff} at every step. It shows that the kernel as a
+whole computes what its OpenCL source describes, and that data
+submitted by the host reaches the kernel and comes back.
+
+\begin{lstlisting}[language=C, caption={[Source of vadd]OpenCL source
+of \texttt{vadd}.}, label={lst:src-vadd}]
+__kernel void vadd(__global int *a, __global int *b, __global int *c)
+{
+    int i = get_global_id(0);
+    c[i] = a[i] + b[i];
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption={[Trace of vadd]Trace of \texttt{vadd},
+abridged.}, label={lst:trace-vadd}]
+PC: 0x0   mask: ffffffff   ld.param.64b %r0, [%arg0]
+          %r0: 0x0 in every lane
+PC: 0x1   mask: ffffffff   ld.param.64b %r1, [%arg1]
+          %r1: 0x80 in every lane
+PC: 0x2   mask: ffffffff   ld.param.64b %r2, [%arg2]
+          %r2: 0x100 in every lane
+PC: 0x3   mask: ffffffff   zext.32b.64b %r3, %localid.x
+          %r3: 0, 1, 2, ..., 31
+...
+PC: 0x7   mask: ffffffff   asr.64b %r7, %r6, 30
+          %r7: 0x0, 0x4, 0x8, ..., 0x7c
+PC: 0x8   mask: ffffffff   ld.global.32b %w0, [%r0 + %r7]
+          %w0: 1, 2, 3, ..., 32
+PC: 0x9   mask: ffffffff   ld.global.32b %w1, [%r1 + %r7]
+          %w1: 1, 2, 3, ..., 32
+PC: 0xa   mask: ffffffff   iadd.32b %w2, %w1, %w0
+          %w2: 2, 4, 6, ..., 64
+PC: 0xb   mask: ffffffff   st.global.32b [%r2 + %r7], %w2
+PC: 0xc   mask: ffffffff   return
+\end{lstlisting}
+
+Three things in the trace are worth noting. The three buffer addresses
+read from parameter memory, \texttt{0x0}, \texttt{0x80} and
+\texttt{0x100}, are 128 bytes apart, one buffer of 32 four-byte
+elements after another, as the host library laid them out. The byte
+offset in \texttt{\%r7} is four times the work-item's id, so each lane
+addresses its own element. And the values stored at \texttt{0xb} run
+2, 4, 6, up to 64, which is what the host reads back.
+
+\paragraph{Forward Divergence: \texttt{nested\_if}.}
+The second kernel loads one value per work-item and runs it through
+nested conditionals, writing a result that depends on the path taken.
+In the trace the value is the work-item's id, so the branches split the
+sub-group into contiguous halves and quarters. The two innermost
+levels compile to \texttt{sel}, so the kernel diverges three
+times, into four groups of eight lanes, each with its own block, and
+all four rejoin at one label before the store. This is the
+\texttt{if}-\texttt{else} of Table~\ref{tab:divergence-if-else},
+nested.
+
+\begin{lstlisting}[caption={[Trace of nested\_if]Trace of
+\texttt{nested\_if}, abridged: the three splits, the four blocks, and
+the join.}, label={lst:trace-forward}]
+PC: 0x5    mask: ffffffff   scmp.gt.32b %p0, %r4, 15
+PC: 0x6    mask: ffffffff   goto.cond %p0, LBB0_4      ; lanes 16-31 leave
+PC: 0x7    mask: 0000ffff   scmp.gt.32b %p1, %r4, 7
+PC: 0x8    mask: 0000ffff   goto.cond %p1, LBB0_3      ; lanes 8-15 leave
+PC: 0x9    mask: 000000ff   scmp.gt.32b %p2, %r4, 3    ; block for lanes 0-7
+...
+PC: 0x10   mask: 000000ff   goto LBB0_7
+PC: 0x11   mask: 0000ff00   LBB0_3:                     ; lanes 8-15
+...
+PC: 0x18   mask: 0000ff00   goto LBB0_7
+PC: 0x19   mask: ffff0000   LBB0_4:                     ; lanes 16-31
+PC: 0x1a   mask: ffff0000   ucmp.gt.32b %p8, %r4, 23
+PC: 0x1b   mask: ffff0000   goto.cond %p8, LBB0_6      ; lanes 24-31 leave
+PC: 0x1c   mask: 00ff0000   ucmp.gt.32b %p9, %r4, 19   ; block for lanes 16-23
+...
+PC: 0x22   mask: 00ff0000   goto LBB0_7
+PC: 0x23   mask: ff000000   LBB0_6:                     ; lanes 24-31
+...
+PC: 0x29   mask: ff000000   sel.16b %r8, %r13, %r14, %p12
+PC: 0x2a   mask: ffffffff   LBB0_7:                     ; all rejoin
+PC: 0x2b   mask: ffffffff   zext.16b.32b %r15, %r8
+           %r15: 0, 0, 2, 2, 4, 4, ..., 30, 30
+PC: 0x2c   mask: ffffffff   st.global.32b [%r1 + %r3], %r15
+\end{lstlisting}
+
+The point of the trace is the order of the blocks and the masks they
+run under. After the splits, lanes 0 to 7 run their block alone while
+lanes 8 to 15 wait at \texttt{0x11}, lanes 16 to 31 at \texttt{0x19},
+and the finished lanes at the join. The lowest counter runs next, so
+the four blocks execute in address order, each under the mask of its
+own eight lanes, and no lane runs a block that is not its own. When
+the last block reaches \texttt{0x2a}, every counter is at the join,
+the mask returns to \texttt{ffffffff}, and the store executes for the
+whole sub-group with each lane holding the value its own path
+computed.
+
+\paragraph{Backward Divergence: \texttt{loop}.}
+The third kernel is a loop that each lane runs a different number of
+times: lane $i$ runs it $i$ times and accumulates the first $i$
+elements of its sub-group's block (Listing~\ref{lst:src-loop}).
+Lane 0 has nothing to do and goes straight to the exit at
+\texttt{LBB0\_3}, so the mask is \texttt{fffffffe} from the first
+instruction after the branch. The body ends with the back-edge at
+\texttt{0x13}, taken while the lane's counter is below its lane id. At
+the end of every trip one lane has reached its count, falls through to
+the exit, and waits there while the others go round again. The lanes
+leave one per trip, in order of their id, and
+Table~\ref{tab:mask-staircase} shows the mask at the back-edge on
+successive trips: the cleared bits grow from the right, one per trip,
+until only lane 31 remains. The only branch inside the loop is the
+back-edge, so the body itself never diverges. When lane 31 falls
+through, all 32 lanes are at the exit, the mask returns to
+\texttt{ffffffff}, and the store runs once for every lane. The whole
+kernel takes 296 steps, 31 of them back-edges. The second sub-group of
+the launch produces a trace of the same shape, over its own block of
+the input.
+
+\begin{lstlisting}[language=C, caption={[Source of loop]OpenCL source
+of \texttt{loop}.}, label={lst:src-loop}]
+__kernel void loop(__global const int *a, __global int *out)
+{
+    int gid  = get_global_id(0);
+    int lid  = get_sub_group_local_id();
+    int base = gid - lid;
+    int s = 0;
+    for (int i = 0; i < lid; i++)
+        s += a[base + i];
+    out[gid] = s;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption={[Trace of loop]Trace of \texttt{loop},
+abridged: the first back-edge, the last one, and the exit.},
+label={lst:trace-loop}]
+PC: 0x6   mask: ffffffff   ucmp.eq.32b %p0, %laneid, 0
+PC: 0x7   mask: ffffffff   goto.cond %p0, LBB0_3
+PC: 0x8   mask: fffffffe   trunc.64b.32b %w1, %d4
+PC: 0x9   mask: fffffffe   isub.32b %w2, %w1, %laneid
+PC: 0xa   mask: fffffffe   mov.32b %w3, %w0
+PC: 0xb   mask: fffffffe   LBB0_2:
+PC: 0xc   mask: fffffffe   iadd.32b %w4, %w2, %w3
+PC: 0xd   mask: fffffffe   sext.32b.64b %d5, %w4
+PC: 0xe   mask: fffffffe   shl.64b %d6, %d5, 2
+PC: 0xf   mask: fffffffe   ld.global.32b %w5, [%d0 + %d6]
+PC: 0x10  mask: fffffffe   iadd.32b %w0, %w5, %w0
+PC: 0x11  mask: fffffffe   iadd.32b %w3, %w3, 1
+PC: 0x12  mask: fffffffe   ucmp.lt.32b %p1, %w3, %laneid
+PC: 0x13  mask: fffffffe   goto.cond %p1, LBB0_2
+PC: 0xb   mask: fffffffc   LBB0_2:
+...
+PC: 0x13  mask: fffffffc   goto.cond %p1, LBB0_2
+PC: 0xb   mask: fffffff8   LBB0_2:
+...
+PC: 0x13  mask: 80000000   goto.cond %p1, LBB0_2
+PC: 0x14  mask: ffffffff   LBB0_3:
+PC: 0x15  mask: ffffffff   shl.64b %d7, %d4, 32
+PC: 0x16  mask: ffffffff   asr.64b %d8, %d7, 32
+PC: 0x17  mask: ffffffff   shl.64b %d9, %d8, 2
+PC: 0x18  mask: ffffffff   st.global.32b [%d1 + %d9], %w0
+PC: 0x19  mask: ffffffff   return
+\end{lstlisting}
+
+In Listing~\ref{lst:trace-loop}, each omitted block is one trip of the body, from the
+label at \texttt{0xb} to the back-edge, under a mask with one more bit
+cleared. After the last back-edge the active lanes are exactly the
+lanes at the exit label, all 32 of them.
+
+\begin{table}[t]
+\centering
+\begin{tabular}{ccc}
+\toprule
+Trip & Mask at back-edge & Active lanes \\
+\midrule
+1  & \texttt{fffffffe} & 31 \\
+2  & \texttt{fffffffc} & 30 \\
+3  & \texttt{fffffff8} & 29 \\
+\multicolumn{3}{c}{$\vdots$} \\
+29 & \texttt{e0000000} & 3 \\
+30 & \texttt{c0000000} & 2 \\
+31 & \texttt{80000000} & 1 \\
+\bottomrule
+\end{tabular}
+\caption[Active mask at the loop back-edge]{Active mask at the back-edge
+of \texttt{loop} on successive trips.}
+\label{tab:mask-staircase}
+\end{table}
+
+\paragraph{Communication under Divergence: \texttt{reduce\_if\_else}.}
+The fourth kernel sums the input over the sub-group with
+\texttt{ired.sum}, but only in lanes 0 to 15, which take one path of a
+branch. The other 16 lanes take the other path and write $-1$
+(Listing~\ref{lst:src-reduce}). The result of the reduction depends
+on which lanes are active when it executes, so this is one of the
+kernels on which the reconvergence model can be observed through the
+output.
+
+\begin{lstlisting}[language=C, caption={[Source of reduce\_if\_else]OpenCL
+source of \texttt{reduce\_if\_else}.}, label={lst:src-reduce}]
+__kernel void reduce_if_else(__global const int *a, __global int *out)
+{
+    int gid = get_global_id(0);
+    int lid = get_sub_group_local_id();
+    if (lid < 16)
+        out[gid] = sub_group_reduce_add(a[gid]);
+    else
+        out[gid] = -1;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption={[Trace of reduce\_if\_else]Trace of
+\texttt{reduce\_if\_else}, abridged: the branch, the two paths, and
+the join.}, label={lst:trace-reduce}]
+PC: 0x5   mask: ffffffff   ucmp.lt.32b %p0, %laneid, 16
+PC: 0x8   mask: ffffffff   goto.cond %p0, LBB0_2      ; lanes 0-15 leave
+PC: 0x9   mask: ffff0000   mov.32b %w0, -1            ; lanes 16-31
+PC: 0xa   mask: ffff0000   goto LBB0_3
+PC: 0xb   mask: 0000ffff   LBB0_2:                    ; lanes 0-15
+PC: 0xc   mask: 0000ffff   ld.global.32b %w1, [%d0 + %d6]
+          %w1: 1, 2, 3, ..., 16 in lanes 0-15
+PC: 0xd   mask: 0000ffff   ired.sum.32b %w0, %w1, -1
+          %w0: 136 in lanes 0-15, -1 in lanes 16-31
+PC: 0xe   mask: ffffffff   LBB0_3:                    ; all rejoin
+PC: 0xf   mask: ffffffff   st.global.32b [%d1 + %d6], %w0
+PC: 0x10  mask: ffffffff   return
+\end{lstlisting}
+
+Two things in the trace (Listing~\ref{lst:trace-reduce}) matter. The
+third operand of \texttt{ired.sum} is $-1$, every lane, and yet the
+result is 136, the sum of 1 to 16: PISA defines the reduction over the
+participating lanes that are active, and the model decides which lanes
+are active at \texttt{0xd}: the 16 that took the branch. And the two paths
+run in address order, lanes 16 to 31 first at \texttt{0x9} and
+\texttt{0xa}, lanes 0 to 15 next at \texttt{0xb} to \texttt{0xd}, with
+the join at \texttt{0xe} once every counter is there. The buffer the
+host reads back holds 136 in its first 16 elements and $-1$ in
+the rest, which is the expected output.
+
+In the three divergent kernels the trace shows what the worked examples
+of Section~\ref{sec:asl-divergence} showed on six instructions: the
+active mask and the global program counter follow from the per-lane
+counters alone, the lanes furthest behind run first, and reconvergence
+happens at the step where the counters coincide, with no reconvergence
+point recorded anywhere.
+
+For 21 of the 23 kernels, the output is fixed by the instruction
+semantics alone, so any correct execution of the subset must produce
+it. The other two, \texttt{shfl\_xor2} and \texttt{reduce\_if\_else},
+run a shuffle or a reduction under a partial mask, and their output
+depends on which lanes are active at that instruction, which PISA does
+not define. For these two, the expected output assumes that the lanes on the same
+path reach the instruction together, as they would in a lockstep
+execution of structured code. The specification produces that output,
+so its reconvergence rule
+activates the expected lanes.
+
+Taken together, the smoke tests show that each instruction of the
+subset computes what PISA prescribes, the kernel tests show that the
+instructions compose and that the sub-group diverges and reconverges as
+the model specifies.

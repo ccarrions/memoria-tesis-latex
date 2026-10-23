@@ -1,0 +1,263 @@
+@misc{pisa-spec,
+	author       = "{Intel Corporation}",
+	title        = "{PISA}: Portable Instruction Set Architecture for {Intel} {GPUs}",
+	howpublished = "\url{https://intel.github.io/pisa/}",
+	note         = "Version 0.1. Source repository: \url{https://github.com/intel/pisa}. Accessed 2026-07-30",
+	year         = "2026"
+}
+
+@misc{pisa-llvm-rfc,
+  author       = {{Intel Corporation}},
+  title        = {{RFC}: Upstreaming the {PISA} backend to {LLVM}},
+  howpublished = {LLVM Discussion Forums},
+  year         = {2026},
+  url          = {https://discourse.llvm.org/t/rfc-upstreaming-the-pisa-backend-to-llvm/91474},
+  note         = {Accessed 2026-10-22}
+}
+
+@misc{pisa-llvm-pr,
+  author       = {{Intel Corporation}},
+  title        = {{[1/7][PISA]} {Add} {PISA} target registration and backend stub},
+  howpublished = {GitHub, llvm/llvm-project pull request 214094},
+  year         = {2026},
+  url          = {https://github.com/llvm/llvm-project/pull/214094},
+  note         = {First of seven pull requests upstreaming the {PISA} backend to {LLVM}. Accessed 2026-10-22}
+}
+
+%% ---------- Chapter 2: ISA specifications ----------
+
+% CHECK: confirm edition and year of the SDM copy cited (bib: year 2025)
+@manual{intel-isa,
+  title        = {Intel 64 and {IA-32} Architectures Software Developer's Manual},
+  author       = {{Intel Corporation}},
+  year         = {2025},
+  note         = {Combined volumes 1--4, order number 325462},
+  url          = {https://www.intel.com/sdm},
+}
+
+% CHECK: confirm version letter and year of the DDI 0487 copy cited (bib: year 2025)
+@manual{arm-spec,
+  title        = {Arm Architecture Reference Manual for {A-profile} architecture},
+  author       = {{Arm Limited}},
+  year         = {2025},
+  note         = {Document DDI 0487},
+  url          = {https://developer.arm.com/documentation/ddi0487/latest},
+}
+
+@inproceedings{reid-trustworthy-specs,
+  author       = {Reid, Alastair},
+  title        = {Trustworthy Specifications of {ARM} {v8-A} and {v8-M} System Level Architecture},
+  booktitle    = {Proceedings of the 16th Conference on Formal Methods in Computer-Aided Design (FMCAD)},
+  year         = {2016},
+  pages        = {161--168},
+  doi          = {10.1109/FMCAD.2016.7886675},
+}
+
+@inproceedings{reid-isa-formal,
+  author       = {Reid, Alastair and Chen, Rick and Deligiannis, Anastasios and Gilday, David and Hoyes, David and Keen, Will and Pathirane, Ashan and Shepherd, Owen and Vrabel, Peter and Zaidi, Ali},
+  title        = {End-to-End Verification of Processors with {ISA-Formal}},
+  booktitle    = {Computer Aided Verification (CAV 2016)},
+  series       = {Lecture Notes in Computer Science},
+  volume       = {9780},
+  pages        = {42--58},
+  year         = {2016},
+  doi          = {10.1007/978-3-319-41540-6_3},
+}
+
+@article{reid-who-guards,
+  author       = {Reid, Alastair},
+  title        = {Who Guards the Guards? {Formal} Validation of the {Arm} {v8-M} Architecture Specification},
+  journal      = {Proceedings of the ACM on Programming Languages},
+  volume       = {1},
+  number       = {OOPSLA},
+  articleno    = {88},
+  year         = {2017},
+  doi          = {10.1145/3133912},
+}
+
+@article{isa-semantics,
+  author       = {Armstrong, Alasdair and Bauereiss, Thomas and Campbell, Brian and Reid, Alastair and Gray, Kathryn E. and Norton, Robert M. and Mundkur, Prashanth and Wassell, Mark and French, Jon and Pulte, Christopher and Flur, Shaked and Stark, Ian and Krishnaswami, Neel and Sewell, Peter},
+  title        = {{ISA} Semantics for {ARMv8-A}, {RISC-V}, and {CHERI-MIPS}},
+  journal      = {Proceedings of the ACM on Programming Languages},
+  volume       = {3},
+  number       = {POPL},
+  articleno    = {71},
+  year         = {2019},
+  doi          = {10.1145/3290384},
+}
+
+@misc{intel-isa-tools,
+  author       = {{Intel Labs}},
+  title        = {isa-tools: Interpreter and compiler for the {ISA} specification language},
+  year         = {2025},
+  howpublished = {GitHub repository},
+  note         = {Version 2.0.0, released 2025-08-29},
+  url          = {https://github.com/IntelLabs/isa-tools},
+}
+
+%% ---------- Chapter 2: virtual ISAs ----------
+
+@inproceedings{adve-llva,
+  author       = {Adve, Vikram and Lattner, Chris and Brukman, Michael and Shukla, Anand and Gaeke, Brian},
+  title        = {{LLVA}: A Low-level Virtual Instruction Set Architecture},
+  booktitle    = {Proceedings of the 36th Annual IEEE/ACM International Symposium on Microarchitecture (MICRO-36)},
+  year         = {2003},
+  pages        = {205--216},
+  doi          = {10.1109/MICRO.2003.1253199},
+}
+
+% CHECK: confirm PTX ISA version cited (e.g. 8.8) and add it to the bib entry
+@manual{ptx-isa,
+  title        = {Parallel Thread Execution {ISA}},
+  author       = {{NVIDIA Corporation}},
+  year         = {2025},
+  url          = {https://docs.nvidia.com/cuda/parallel-thread-execution/},
+}
+
+% CHECK: confirm revision and date of the OpenCL 3.0 spec copy cited (bib: year 2024)
+@manual{opencl,
+  title        = {The {OpenCL} Specification},
+  author       = {{Khronos OpenCL Working Group}},
+  organization = {The Khronos Group},
+  year         = {2024},
+  note         = {Version 3.0},
+  url          = {https://registry.khronos.org/OpenCL/},
+}
+
+%% ---------- Chapter 2: GPU execution and GPU ISA specifications ----------
+
+@article{lindholm-tesla,
+  author       = {Lindholm, Erik and Nickolls, John and Oberman, Stuart and Montrym, John},
+  title        = {{NVIDIA} {Tesla}: A Unified Graphics and Computing Architecture},
+  journal      = {IEEE Micro},
+  volume       = {28},
+  number       = {2},
+  pages        = {39--55},
+  year         = {2008},
+  doi          = {10.1109/MM.2008.31},
+}
+
+@inproceedings{lustig-ptx-mcm,
+  author       = {Lustig, Daniel and Sahasrabuddhe, Sameer and Giroux, Olivier},
+  title        = {A Formal Analysis of the {NVIDIA} {PTX} Memory Consistency Model},
+  booktitle    = {Proceedings of the 24th International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS)},
+  year         = {2019},
+  pages        = {257--270},
+  doi          = {10.1145/3297858.3304043},
+}
+
+@inproceedings{alglave-gpu-concurrency,
+  author       = {Alglave, Jade and Batty, Mark and Donaldson, Alastair F. and Gopalakrishnan, Ganesh and Ketema, Jeroen and Poetzl, Daniel and Sorensen, Tyler and Wickerson, John},
+  title        = {{GPU} Concurrency: Weak Behaviours and Programming Assumptions},
+  booktitle    = {Proceedings of the 20th International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS)},
+  year         = {2015},
+  pages        = {577--591},
+  doi          = {10.1145/2694344.2694391},
+}
+
+@inproceedings{habermaier-simt,
+  author       = {Habermaier, Axel and Knapp, Alexander},
+  title        = {On the Correctness of the {SIMT} Execution Model of {GPUs}},
+  booktitle    = {Programming Languages and Systems (ESOP 2012)},
+  series       = {Lecture Notes in Computer Science},
+  volume       = {7211},
+  pages        = {316--335},
+  year         = {2012},
+  doi          = {10.1007/978-3-642-28869-2_16},
+}
+
+@inproceedings{ocelot,
+  author       = {Diamos, Gregory and Kerr, Andrew and Yalamanchili, Sudhakar and Clark, Nathan},
+  title        = {{Ocelot}: A Dynamic Optimization Framework for Bulk-Synchronous Applications in Heterogeneous Systems},
+  booktitle    = {Proceedings of the 19th International Conference on Parallel Architectures and Compilation Techniques (PACT)},
+  year         = {2010},
+  pages        = {353--364},
+  doi          = {10.1145/1854273.1854318},
+}
+
+@inproceedings{gutierrez-lost-abstraction,
+  author       = {Gutierrez, Anthony and Beckmann, Bradford M. and Dutu, Alexandru and Gross, Joseph and LeBeane, Michael and Kalamatianos, John and Kayiran, Onur and Poremba, Matthew and Potter, Brandon and Puthoor, Sooraj and Sinclair, Matthew D. and Wyse, Mark and Yin, Jieming and Zhang, Xianwei and Jain, Akshay and Rogers, Timothy},
+  title        = {Lost in Abstraction: Pitfalls of Analyzing {GPUs} at the Intermediate Language Level},
+  booktitle    = {Proceedings of the IEEE International Symposium on High Performance Computer Architecture (HPCA)},
+  year         = {2018},
+  pages        = {608--619},
+  doi          = {10.1109/HPCA.2018.00058},
+}
+
+% CHECK: confirm year on the title page (bib says 2009; hgpu.org lists 2011)
+@mastersthesis{claret-ptx-emulation,
+  author       = {Claret Exojo, Albert},
+  title        = {Design and Implementation of a {PTX} Emulation Library},
+  school       = {Universitat Polit\`ecnica de Catalunya, Departament d'Arquitectura de Computadors},
+  year         = {2009},
+  type         = {Projecte Final de Carrera},
+  url          = {https://upcommons.upc.edu/handle/2099.1/7589},
+}
+
+@inproceedings{gpuverify,
+  author    = {Betts, Adam and Chong, Nathan and Donaldson, Alastair F. and Qadeer, Shaz and Thomson, Paul},
+  title     = {{GPUVerify}: A Verifier for {GPU} Kernels},
+  booktitle = {Proceedings of the ACM International Conference on Object Oriented Programming Systems Languages and Applications (OOPSLA)},
+  year      = {2012},
+  pages     = {113--132},
+  doi       = {10.1145/2384616.2384625},
+}
+
+@inproceedings{gpgpu-sim,
+  author    = {Bakhoda, Ali and Yuan, George L. and Fung, Wilson W. L. and Wong, Henry and Aamodt, Tor M.},
+  title     = {Analyzing {CUDA} Workloads Using a Detailed {GPU} Simulator},
+  booktitle = {Proceedings of the IEEE International Symposium on Performance Analysis of Systems and Software (ISPASS)},
+  year      = {2009},
+  pages     = {163--174},
+  doi       = {10.1109/ISPASS.2009.4919648},
+}
+
+@inproceedings{accel-sim,
+  author    = {Khairy, Mahmoud and Shen, Zhesheng and Aamodt, Tor M. and Rogers, Timothy G.},
+  title     = {{Accel-Sim}: An Extensible Simulation Framework for Validated {GPU} Modeling},
+  booktitle = {Proceedings of the ACM/IEEE 47th Annual International Symposium on Computer Architecture (ISCA)},
+  year      = {2020},
+  pages     = {473--486},
+  doi       = {10.1109/ISCA45697.2020.00047},
+}
+
+%% ---------- Chapter 2: ASL ----------
+
+% CHECK: confirm version letter and year of the DDI 0626 copy cited (bib: year 2024)
+@manual{asl-reference,
+  title        = {Architecture Specification Language Reference},
+  author       = {{Arm Limited}},
+  year         = {2024},
+  note         = {Document DDI 0626},
+  url          = {https://developer.arm.com/documentation/ddi0626/latest},
+}
+
+% CHECK: record the herdtools7 commit or release used in the bib entry
+@misc{aslref,
+  author       = {{Arm Limited}},
+  title        = {{ASLRef}: reference interpreter for {ASL}},
+  howpublished = {Part of the herdtools7 repository, directory \texttt{asllib}},
+  year         = {2025},
+  url          = {https://github.com/herd/herdtools7},
+}
+
+% CHECK: confirm release date of ASLi v1.0.0 (bib: year 2024)
+@misc{asli,
+  author       = {{Intel Labs}},
+  title        = {{ASLi}: {ASL} interpreter},
+  howpublished = {GitHub repository},
+  year         = {2024},
+  note         = {Version 1.0.0},
+  url          = {https://github.com/IntelLabs/asl-interpreter},
+}
+
+%% ---------- Chapter 3 ----------
+
+@techreport{collange-stackless,
+  author       = {Collange, Caroline},
+  title        = {Stack-less {SIMT} reconvergence at low cost},
+  institution  = {ENS Lyon},
+  year         = {2011},
+  number       = {hal-00622654},
+  url          = {https://hal.science/hal-00622654},
+}
